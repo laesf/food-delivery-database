@@ -46,3 +46,9 @@ To test and deploy the database locally:
    ```bash
    git clone [https://github.com/laesf/food-delivery-database.git](https://github.com/laesf/food-delivery-database.git)
    cd food-delivery-database
+
+## Schema
+<img width="1838" height="1002" alt="Diagramma_ER" src="https://github.com/user-attachments/assets/3f7d3380-0b67-4563-8470-55cbcfd73b63" />
+
+
+
