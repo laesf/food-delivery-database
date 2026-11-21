@@ -1,54 +1,79 @@
-# Food Delivery Database System
+# Food Delivery Database
 
-A comprehensive relational database architecture optimized for the **Food Delivery** platform. This application includes DDL for data structure, strict referential integrity management, and a solid layer of business logic through **SQL Trigger** technology.
+Relational schema for a food delivery service, written for MySQL/MariaDB. Business rules such as order totals, allergen checks, review validation and rider workload are enforced in the database with triggers rather than in application code.
 
-## Project Overview
-
-This database is designed to manage the entire process of handling a home delivery order, managing complex entities and their relationships, such as:
-* **Users & Customers:** Profile management and tracking of intolerances/allergens.
-* **Restaurants & Dishes:** Menu and food category management; allergen tracking in dishes.
-* **Riders:** Real-time workload tracking (assigned and ongoing orders).
-* **Orders & Shopping Carts:** Product transaction management; total calculation; order status tracking.
-* **Reviews:** Feedback with dynamic calculation of average ratings for restaurants.
-
-## Repository Structure
-
-The project is divided into two main files to separate the definition of the structure from the active logic:
-
-* `deliv_data.sql`: Contains the **Data Definition Language (DDL)**. Creates tables, defines data types, primary keys (PK), and referential integrity constraints (Foreign Keys).
-* `triggers.sql`: Contains the **advanced Data Manipulation Language (DML)**. Defines the active rules (Triggers) to automate and protect the system.
-
-## Automated Business Logic (Triggers)
-
-At the core of our system are 11 triggers that guarantee data accuracy and reliability without having to resort to backend calculations:
-
-### Shopping Cart and Order Management
-
-* **`cart_before_insert`**: Validates quantity, calculates the price per line, and *checks for any conflicts between the allergens in the dish and those reported by the customer*.
-* **`carrello_after_insert` / `_update` / `_delete`**: Dynamically recalculate the total price of the associated order in real time each time the cart is modified.
-
-### Review Management
-
-* **`recensione_before_insert` / `_update`**: Restrict the insertion or modification of reviews *only* if the order is actually “delivered” and ensure that ratings are between 1 and 5.
-* **`recensione_after_insert` / `_update` / `_delete`**: Automatically update the restaurant's `media_voti` by calculating the mathematical average of all active reviews.
-
-### Fleet Management (Riders)
-
-* **`order_after_insert`**: Automatically increments the `busy` counter of the rider assigned to the order.
-* **`order_after_update`**: Dynamically manages changes
-
-## Installation and Use
-
-To test and deploy the database locally:
-
-1. Run a **MySQL** or **MariaDB** server (for example, through XAMPP, MAMP, Docker, etc.).
-2. Clone the repository:
-   ```bash
-   git clone [https://github.com/laesf/food-delivery-database.git](https://github.com/laesf/food-delivery-database.git)
-   cd food-delivery-database
+Built as a university databases project. Table and column names are in Italian.
 
 ## Schema
-<img width="1838" height="1002" alt="Diagramma_ER" src="https://github.com/user-attachments/assets/3f7d3380-0b67-4563-8470-55cbcfd73b63" />
 
+<img width="1838" height="1002" alt="Entity-relationship diagram" src="https://github.com/user-attachments/assets/3f7d3380-0b67-4563-8470-55cbcfd73b63" />
 
+13 tables with primary keys (composite on the junction tables) and 13 foreign key constraints:
 
+| Area | Tables |
+| :--- | :--- |
+| Customers | `cliente`, `alergene_utente` (customer allergens) |
+| Restaurants and menu | `ristorante`, `categorie`, `ristorante_categoria`, `piatto` (dishes), `allergeni`, `alergene_piatto` (dish allergens) |
+| Orders | `ordine`, `carrello` (order lines) |
+| Riders | `rider`, `paga` (payments) |
+| Reviews | `recensione`, limited to one per order by a unique key |
+
+Prices are stored as `DECIMAL(10,2)`; a dish has a net price (`imponibile`) and a VAT rate (`iva`, percent).
+
+## Triggers
+
+`triggers.sql` defines 11 triggers. It drops them first, so it can be re-run.
+
+| Trigger | Table | Behaviour |
+| :--- | :--- | :--- |
+| `carrello_before_insert` | `carrello` | Rejects a missing or non-positive quantity; fills in a missing price as net price plus VAT; rejects a dish containing an allergen registered for the customer |
+| `carrello_after_insert`, `carrello_after_update`, `carrello_after_delete` | `carrello` | Recalculate the order total; when a line moves to another order, both totals are updated |
+| `recensione_before_insert` | `recensione` | Allows a review only for a delivered order (`stato = 'consegnato'`); ratings must be between 1 and 5 |
+| `recensione_before_update` | `recensione` | Same rating check; if the review is moved to another order, that order must be delivered |
+| `recensione_after_insert`, `recensione_after_update`, `recensione_after_delete` | `recensione` | Recalculate the restaurant's average rating (`media_voti`); it is set to 0 when the restaurant has no reviews left |
+| `ordine_after_insert` | `ordine` | Increments the assigned rider's active order counter (`impegnato`) if the order is active |
+| `ordine_after_update` | `ordine` | Updates the counters when an order is reassigned, closed or reopened |
+
+An order is active unless its status is `'consegnato'` (delivered) or `'annullato'` (cancelled). The two `ordine` triggers keep `rider.impegnato` equal to the number of active orders assigned to each rider.
+
+Rule violations are raised with `SIGNAL SQLSTATE '45000'` and an error message.
+
+## Setup
+
+```bash
+git clone https://github.com/laesf/food-delivery-database.git
+cd food-delivery-database
+mysql -e "CREATE DATABASE food_delivery"
+mysql food_delivery < deliv_data.sql
+mysql food_delivery < triggers.sql
+```
+
+Use `mariadb` instead of `mysql` on recent MariaDB versions, and add connection options (`-u`, `-p`, `-h`) as needed.
+
+## Tests
+
+`tests.sql` checks every trigger, including the rejected cases. Run it on an empty test database with the schema and triggers loaded:
+
+```bash
+mysql -e "CREATE DATABASE food_delivery_test"
+mysql food_delivery_test < deliv_data.sql
+mysql food_delivery_test < triggers.sql
+mysql -t food_delivery_test < tests.sql
+```
+
+The script works inside a transaction that it rolls back, so no data is left behind. It prints each check and a summary of passed and failed checks.
+
+Tested on MariaDB 13.0. MySQL has not been tested.
+
+## Files
+
+| File | Contents |
+| :--- | :--- |
+| `deliv_data.sql` | Tables, keys and foreign keys |
+| `triggers.sql` | The 11 triggers |
+| `tests.sql` | Trigger tests |
+
+## Limitations
+
+- `ordine.stato` is free text; only `'consegnato'` and `'annullato'` have a meaning in the triggers.
+- The rider counter is maintained on order insert and update only. Deleting an active order, or editing `rider.impegnato` directly, leaves it out of sync.

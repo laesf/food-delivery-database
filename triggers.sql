@@ -12,7 +12,9 @@
 --  8.  recensione_after_update     -> aggiorna media_voti ristorante
 --  9.  recensione_after_delete     -> aggiorna media_voti ristorante
 -- 10.  ordine_after_insert         -> incrementa contatore impegnato del rider
--- 11.  ordine_after_update         -> gestisce cambio rider e chiusura ordine
+--                                     se l'ordine e attivo
+-- 11.  ordine_after_update         -> aggiorna il contatore su cambio rider,
+--                                     chiusura e riapertura dell'ordine
 --
 --
 -- OPERATORE <=> (NULL-safe equal, MariaDB/MySQL):
@@ -455,7 +457,8 @@ END$$
 -- TRIGGER 10: ordine_after_insert
 -- AFTER INSERT ON ordine
 --
--- Incrementa il contatore impegnato del rider (+1).
+-- Incrementa il contatore impegnato del rider (+1) se l'ordine
+-- e attivo (stato diverso da 'consegnato' e 'annullato').
 -- ordine.rider e VARCHAR(255) NOT NULL -> nessun rischio NULL.
 -- -------------------------------------------------------
 
@@ -463,9 +466,11 @@ CREATE TRIGGER `ordine_after_insert`
 AFTER INSERT ON `ordine`
 FOR EACH ROW
 BEGIN
-    UPDATE `rider`
-    SET `impegnato` = COALESCE(`impegnato`, 0) + 1
-    WHERE `cf` = NEW.rider;
+    IF COALESCE(NEW.stato, '') NOT IN ('consegnato', 'annullato') THEN
+        UPDATE `rider`
+        SET `impegnato` = COALESCE(`impegnato`, 0) + 1
+        WHERE `cf` = NEW.rider;
+    END IF;
 END$$
 
 
@@ -473,42 +478,36 @@ END$$
 -- TRIGGER 11: ordine_after_update
 -- AFTER UPDATE ON ordine
 --
--- (a) Cambio rider (ordine.rider NOT NULL -> <> e sicuro):
---     - Decrementa il vecchio rider.
---     - Incrementa il nuovo rider SOLO se l'ordine e ancora attivo.
---       COALESCE(NEW.stato,'') evita UNKNOWN se NEW.stato e NULL.
+-- Mantiene rider.impegnato uguale al numero di ordini attivi
+-- (stato diverso da 'consegnato' e 'annullato') del rider:
 --
--- (b) Chiusura ordine (stato -> 'consegnato' o 'annullato'):
---     - Decrementa il rider corrente.
---       COALESCE(OLD.stato,'') evita UNKNOWN se OLD.stato e NULL.
+-- (a) Il vecchio rider perde l'ordine se era attivo e cambia
+--     rider oppure viene chiuso.
+-- (b) Il nuovo rider acquisisce l'ordine se e attivo e cambia
+--     rider oppure viene riaperto.
+--
+-- ordine.rider e NOT NULL -> <> e sicuro.
+-- COALESCE(stato,'') evita UNKNOWN se lo stato e NULL.
 -- -------------------------------------------------------
 
 CREATE TRIGGER `ordine_after_update`
 AFTER UPDATE ON `ordine`
 FOR EACH ROW
 BEGIN
-    -- (a) Cambio rider
-    IF OLD.rider <> NEW.rider THEN
+    DECLARE v_era_attivo BOOLEAN DEFAULT COALESCE(OLD.stato, '') NOT IN ('consegnato', 'annullato');
+    DECLARE v_e_attivo   BOOLEAN DEFAULT COALESCE(NEW.stato, '') NOT IN ('consegnato', 'annullato');
 
-        -- Decrementa il rider precedente (non scende sotto 0)
+    -- (a) Decrementa il vecchio rider (non scende sotto 0)
+    IF v_era_attivo AND (OLD.rider <> NEW.rider OR NOT v_e_attivo) THEN
         UPDATE `rider`
         SET `impegnato` = GREATEST(COALESCE(`impegnato`, 0) - 1, 0)
         WHERE `cf` = OLD.rider;
-
-        -- Incrementa il nuovo rider solo se l'ordine e ancora attivo
-        IF COALESCE(NEW.stato, '') NOT IN ('consegnato', 'annullato') THEN
-            UPDATE `rider`
-            SET `impegnato` = COALESCE(`impegnato`, 0) + 1
-            WHERE `cf` = NEW.rider;
-        END IF;
-
     END IF;
 
-    -- (b) Ordine appena terminato -> decrementa il rider corrente
-    IF NEW.stato IN ('consegnato', 'annullato')
-       AND COALESCE(OLD.stato, '') NOT IN ('consegnato', 'annullato') THEN
+    -- (b) Incrementa il nuovo rider
+    IF v_e_attivo AND (OLD.rider <> NEW.rider OR NOT v_era_attivo) THEN
         UPDATE `rider`
-        SET `impegnato` = GREATEST(COALESCE(`impegnato`, 0) - 1, 0)
+        SET `impegnato` = COALESCE(`impegnato`, 0) + 1
         WHERE `cf` = NEW.rider;
     END IF;
 END$$

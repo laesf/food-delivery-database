@@ -21,7 +21,7 @@ CREATE TABLE `alergene_utente` (
 
 -- Struttura della tabella `allergeni`
 CREATE TABLE `allergeni` (
-  `id`        int(10)      NOT NULL AUTO_INCREMENT,
+  `id`        int(10)      NOT NULL,
   `allergene` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
@@ -35,14 +35,14 @@ CREATE TABLE `carrello` (
 
 -- Struttura della tabella `categorie`
 CREATE TABLE `categorie` (
-  `id`         int(10)      NOT NULL AUTO_INCREMENT,
+  `id`         int(10)      NOT NULL,
   `created_at` timestamp    NOT NULL DEFAULT current_timestamp(),
   `nome`       varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 -- Struttura della tabella `cliente`
 CREATE TABLE `cliente` (
-  `id`         int(10)      NOT NULL AUTO_INCREMENT,
+  `id`         int(10)      NOT NULL,
   `iscrizione` timestamp    NOT NULL DEFAULT current_timestamp(),
   `nome`       varchar(255) DEFAULT NULL,
   `cognome`    varchar(255) DEFAULT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE `cliente` (
 
 -- Struttura della tabella `ordine`
 CREATE TABLE `ordine` (
-  `id`        int(10)       NOT NULL AUTO_INCREMENT,
+  `id`        int(10)       NOT NULL,
   `data`      timestamp     NOT NULL DEFAULT current_timestamp(),
   `utente`    int(11)       NOT NULL,
   `rider`     varchar(255)  NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `ordine` (
 
 -- Struttura della tabella `paga`
 CREATE TABLE `paga` (
-  `id`   int(10)       NOT NULL AUTO_INCREMENT,
+  `id`   int(10)       NOT NULL,
   `data` timestamp     NOT NULL DEFAULT current_timestamp(),
   `paga` DECIMAL(10,2) DEFAULT NULL,
   `cf`   varchar(255)  DEFAULT NULL
@@ -74,7 +74,7 @@ CREATE TABLE `paga` (
 
 -- Struttura della tabella `piatto`
 CREATE TABLE `piatto` (
-  `id`          int(10)       NOT NULL AUTO_INCREMENT,
+  `id`          int(10)       NOT NULL,
   `nome`        varchar(255)  DEFAULT NULL,
   `ristorante`  int(11)       DEFAULT NULL,
   `descrizione` varchar(255)  DEFAULT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE `piatto` (
 
 -- Struttura della tabella `recensione`
 CREATE TABLE `recensione` (
-  `id`              int(10)   NOT NULL AUTO_INCREMENT,
+  `id`              int(10)   NOT NULL,
   `created_at`      timestamp NOT NULL DEFAULT current_timestamp(),
   `ordine`          int(11)   DEFAULT NULL,
   `voto_ristorante` int(11)   DEFAULT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE `rider` (
 
 -- Struttura della tabella `ristorante`
 CREATE TABLE `ristorante` (
-  `id`         int(10)       NOT NULL AUTO_INCREMENT,
+  `id`         int(10)       NOT NULL,
   `iscrizione` timestamp     NOT NULL DEFAULT current_timestamp(),
   `nome`       varchar(255)  DEFAULT NULL,
   `tipologia`  int(11)       DEFAULT NULL,
